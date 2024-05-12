@@ -1,0 +1,60 @@
+[AUD]
+symbol = 'AUD'
+secType = 'FUT'
+exchange = 'GLOBEX'
+currency = 'USD'
+multiplier = 1000
+marketName = ''
+minTick = 0.0001
+longName = ''
+contractMonth = "['H''M''U''Z']"
+timeZoneId = ''
+tradingHours = ''
+liquidHours = ''
+lastTradeTime = ''
+minSize = 1
+sizeIncrement = 1
+initMargin = 19440.66
+commission = 3.5
+filename = '6A_cc.csv'
+
+[CL]
+symbol = 'CL'
+secType = 'FUT'
+exchange = 'CBOT'
+currency = 'USD'
+multiplier = 100
+marketName = ''
+minTick = 0.01
+longName = ''
+contractMonth = "['H''M''U''Z']"
+timeZoneId = ''
+tradingHours = ''
+liquidHours = ''
+lastTradeTime = ''
+minSize = 1
+sizeIncrement = 1
+initMargin = 19440.66
+commission = 3.5
+filename = 'CL_cc.csv'
+
+[ES]
+symbol = 'ES'
+secType = 'FUT'
+exchange = 'CME'
+currency = 'USD'
+multiplier = 50
+marketName = ''
+minTick = 0.25
+longName = ''
+contractMonth = "['H''M''U''Z']"
+timeZoneId = ''
+tradingHours = ''
+liquidHours = ''
+lastTradeTime = ''
+minSize = 1
+sizeIncrement = 1
+initMargin = 19440.66
+commission = 3.5
+filename = 'ES_cc.csv'
+
