@@ -9,10 +9,11 @@ from ibkr.broker.sim_contract_sim import load_contract
 
 from ibkr.broker.sim_contract_sim import load_csv
 
-from ibkr.strategy.bb_rsi import BBRSI, Signals
+from ibkr.strategy.bb_rsi import BBRSI, MeanReversion, Signals
 
 import logging
-util.logToConsole(logging.DEBUG)
+util.logToConsole(logging.INFO)
+util.logToFile('ibkr.log', logging.INFO)
 
 
 ib = IBSim()
@@ -21,30 +22,48 @@ ib.connect('127.0.0.1', 7497, clientId=1)
 contract = load_contract('AUD')
 ib.qualifyContracts(contract)
 
-strategy = BBRSI(20, 2, 10)  
+strategy = MeanReversion()  
 
 
 def update_stats():
     pass
 
-def check_executions(bars):
-    pass
 
 def check_strategy(bars):
     strategy.update(bars, hasNewBar=False)
-    inTrade = len(ib.positions()) > 0
-    if strategy.signal == Signals.LONG and not inTrade:                 # FIXME: Add check for in trade already
-        # TODO: Move to Order Function that checks balance, claculates Stop Loss and buy Price etc ..
-        order = LimitOrder('BUY', 50000, bars[-1].close)
-        trade = ib.placeOrder(contract, order)
-    if strategy.signal == Signals.SHORT and not inTrade:                # FIXME: Add check for in trade already
-        order = LimitOrder('SELL', 50000, bars[-1].close)
-        trade = ib.placeOrder(contract, order)
+    
+    match strategy.signal :
+        case Signals.BUY:
+            qty = 1 
+            order = LimitOrder('BUY', qty, bars[-1].close)
+            trade = ib.placeOrder(contract, order)
+            strategy.inTrade = 1
+        case Signals.SELL:
+            qty = 1
+            order = LimitOrder('SELL', qty, bars[-1].close)
+            trade = ib.placeOrder(contract, order)
+            strategy.inTrade = 0
+        case Signals.SHORT:
+            qty = 1
+            order = LimitOrder('SELL', qty, bars[-1].close)
+            trade = ib.placeOrder(contract, order)
+            strategy.inTrade = -1
+        case Signals.COVER:
+            qty = 1
+            order = LimitOrder('BUY', qty, bars[-1].close)
+            trade = ib.placeOrder(contract, order)
+            strategy.inTrade = 0
+
+
+
+
+
+
 
 def on_bar_update(bars, hasNewBar):
-    check_executions(bars)    
-    check_strategy(bars)
+    ib.client.update_executions(bars[-1])   
     update_stats()
+    check_strategy(bars)    
 
 
 def main():
@@ -63,7 +82,7 @@ def main():
 
     ib.run()
 
-    # print("---------------------------------")
+    print("---------------------------------")
     # print('Ending cash: ' + str(self.portfolio.cash))
     # print('Ending market value: ' + str(self.portfolio.market_value))
     # print('Ending asset value: ' + str(self.portfolio.get_asset_val()))

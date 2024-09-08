@@ -10,8 +10,22 @@ from ib_insync import Future, Contract, ContractDetails
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),'data')
 
-with open(os.path.join(DATA_DIR,"#contracts.toml"), "rb") as f:
+with open(os.path.join(DATA_DIR,"contracts.toml"), "rb") as f:
     _contracts = tomllib.load(f)
+
+def get_margin(symbol: str) -> float:
+    try:
+        contract_dict = _contracts[symbol]
+    except KeyError:
+        raise ValueError(f"Contract {symbol} not found in contracts.toml")
+    return float(contract_dict["initMargin"])
+
+def get_commission(symbol: str) -> float:
+    try:
+        contract_dict = _contracts[symbol]
+    except KeyError:
+        raise ValueError(f"Contract {symbol} not found in contracts.toml")
+    return float(contract_dict["commission"])
 
 def load_contract(symbol: str) -> Contract:
     try:
@@ -20,7 +34,9 @@ def load_contract(symbol: str) -> Contract:
         raise ValueError(f"Contract {symbol} not found in contracts.toml")
 
     contract = Contract()
+    contract.conId = int(contract_dict["conId"])
     contract.symbol = contract_dict["symbol"]
+    contract.tradingClass = contract_dict["tradingClass"]
     contract.secType = contract_dict["secType"]
     contract.exchange = contract_dict["exchange"]
     contract.currency = contract_dict["currency"]
@@ -47,8 +63,6 @@ def load_contractDetails(symbol: str) -> ContractDetails:
     details.lastTradeTime = contract_dict["lastTradeTime"]
     details.minSize = int(contract_dict["minSize"])
     details.sizeIncrement = contract_dict["sizeIncrement"]
-    # details.initMargin = contract_dict["initMargin"]
-    # details.commission = contract_dict["commission"]
     return details
 
 def load_csv(symbol: str) -> pd.DataFrame:
@@ -66,5 +80,14 @@ def load_csv(symbol: str) -> pd.DataFrame:
     return _df
             
     
+def load_openorders():
+    # TODO : implement load of open orders from DB 
+    return {}
 
+def load_positions() -> Contract:
+    # TODO : implement load of open positions from DB 
+    return {}
 
+def load_executions():
+    # TODO : implement load of execution history from DB
+    return {}

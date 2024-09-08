@@ -1,9 +1,11 @@
 [AUD]
 symbol = 'AUD'
+conId = 371277216
+tradingClass='6A'
 secType = 'FUT'
 exchange = 'GLOBEX'
 currency = 'USD'
-multiplier = 1000
+multiplier = 100000
 marketName = ''
 minTick = 0.0001
 longName = ''
@@ -19,11 +21,13 @@ commission = 3.5
 filename = '6A_cc.csv'
 
 [CL]
-symbol = 'CL'
+symbol = 'CLN4'
+conId = 304037454
+tradingClass='CL'
 secType = 'FUT'
-exchange = 'CBOT'
+exchange = 'NYMEX'
 currency = 'USD'
-multiplier = 100
+multiplier = 1000
 marketName = ''
 minTick = 0.01
 longName = ''
@@ -40,6 +44,8 @@ filename = 'CL_cc.csv'
 
 [ES]
 symbol = 'ES'
+conId = 551601561
+tradingClass='ES'
 secType = 'FUT'
 exchange = 'CME'
 currency = 'USD'
