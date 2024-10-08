@@ -1,25 +1,23 @@
 
-import asyncio
-
-from ib_insync import util
-from ib_insync.order import LimitOrder, Order, OrderStatus, StopOrder
+from ib_async import util
+from ib_async.order import LimitOrder, Order, OrderStatus, StopOrder
 
 from ibkr.broker.sim_ib import IBSim
 from ibkr.broker.sim_contract_sim import load_contract
 
 from ibkr.broker.sim_contract_sim import load_csv
 
-from ibkr.strategy.bb_rsi import BBRSI, MeanReversion, Signals
+from ibkr.strategy.bb_rsi import MeanReversion, Signals
 
 import logging
 util.logToConsole(logging.INFO)
-util.logToFile('ibkr.log', logging.INFO)
+util.logToFile('ibkr.log', logging.ERROR)
 
 
 ib = IBSim()
 ib.connect('127.0.0.1', 7497, clientId=1)
 
-contract = load_contract('AUD')
+contract = load_contract('ES')
 ib.qualifyContracts(contract)
 
 strategy = MeanReversion()  
@@ -53,10 +51,6 @@ def check_strategy(bars):
             order = LimitOrder('BUY', qty, bars[-1].close)
             trade = ib.placeOrder(contract, order)
             strategy.inTrade = 0
-
-
-
-
 
 
 
@@ -106,5 +100,6 @@ def main():
 if __name__ == "__main__":
     try:
         main()
+        logging.info("==== Done ====")
     finally:
         ib.disconnect()

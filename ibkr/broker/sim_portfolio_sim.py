@@ -1,10 +1,10 @@
 import logging
 from typing import (Any, Dict, List, Optional, Set, TYPE_CHECKING, Tuple,Union, cast)
 
-from ib_insync.contract import (
+from ib_async.contract import (
     Contract, ContractDescription, ContractDetails, DeltaNeutralContract,
     ScanData)
-from ib_insync.objects import (
+from ib_async.objects import (
     AccountValue, BarData, BarDataList, CommissionReport, DOMLevel,
     DepthMktDataDescription, Dividends, Execution, FamilyCode, Fill,
     FundamentalRatios, HistogramData, HistoricalNews, HistoricalSchedule,
@@ -14,14 +14,14 @@ from ib_insync.objects import (
     Position, PriceIncrement, RealTimeBar, RealTimeBarList, SoftDollarTier,
     TickAttribBidAsk, TickAttribLast, TickByTickAllLast, TickByTickBidAsk,
     TickByTickMidPoint, TickData, TradeLogEntry)
-from ib_insync.order import Order, OrderState, OrderStatus, Trade
-from ib_insync.ticker import Ticker
-from ib_insync.util import (
+from ib_async.order import Order, OrderState, OrderStatus, Trade
+from ib_async.ticker import Ticker
+from ib_async.util import (
     UNSET_DOUBLE, UNSET_INTEGER, dataclassAsDict, dataclassUpdate,
     getLoop, globalErrorEvent, isNan, parseIBDatetime)
 
 if TYPE_CHECKING:
-    from ib_insync.ib import IB
+    from ib_async.ib import IB
 
 
 OrderKeyType = Union[int, Tuple[int, int]]

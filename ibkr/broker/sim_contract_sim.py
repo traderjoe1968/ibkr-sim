@@ -6,7 +6,7 @@ from functools import cache
 from dataclasses import dataclass, field
 from typing import List, NamedTuple, Optional
 
-from ib_insync import Future, Contract, ContractDetails
+from ib_async import Future, Contract, ContractDetails
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),'data')
 

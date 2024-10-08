@@ -1,6 +1,6 @@
 
-from ib_insync import IB
-from ib_insync.order import BracketOrder, LimitOrder, Order, OrderState, OrderStatus, StopOrder, Trade
+from ib_async import IB
+from ib_async.order import BracketOrder, LimitOrder, Order, OrderState, OrderStatus, StopOrder, Trade
 
 from ibkr.broker.sim_client import SimClient
 

@@ -9,12 +9,12 @@ from typing import Deque, Awaitable, Dict, Iterator, List, Optional, Union, over
 
 from eventkit import Event
 
-from ib_insync.client import Client
-from ib_insync.wrapper import Wrapper
-from ib_insync import util
-from ib_insync.contract import (ComboLeg, Contract, ContractDescription, ContractDetails, DeltaNeutralContract)
-from ib_insync.order import BracketOrder, LimitOrder, Order, OrderState, OrderStatus, StopOrder, Trade
-from ib_insync.objects import (
+from ib_async.client import Client
+from ib_async.wrapper import Wrapper
+from ib_async import util
+from ib_async.contract import (ComboLeg, Contract, ContractDescription, ContractDetails, DeltaNeutralContract)
+from ib_async.order import BracketOrder, LimitOrder, Order, OrderState, OrderStatus, StopOrder, Trade
+from ib_async.objects import (
     BarData, CommissionReport, DepthMktDataDescription, Execution, FamilyCode,
     HistogramData, HistoricalSession, HistoricalTick, HistoricalTickBidAsk,
     HistoricalTickLast, NewsProvider, PriceIncrement, SmartComponent,
@@ -34,10 +34,10 @@ class SimClient(Client):
         self._serverVersion = 150
         self._apiReady = True
         self._permIdSeq = 123456000
-        self._execIdSeq = int(0x0000e1a766468faa0000)
+        self._execIdSeq = int(0x1_000_000_000)
         self._accounts = getAccounts()
-        self.TotalCashBalance = 100000.0
-        self.TotalCashValue = 100000.0
+        self.TotalCashBalance = 100_000.0
+        self.TotalCashValue = 100_000.0
         self.TotalDailyProfit = 0.0
 
     @override
@@ -141,7 +141,7 @@ class SimClient(Client):
 
     @override
     def reqOpenOrders(self):
-        oo = load_openorders()
+        oo = load_openorders()  # FIXME:
         if oo:
             c = Contract()
             o = Order()
@@ -155,7 +155,7 @@ class SimClient(Client):
 
     @override   
     def reqExecutions(self, reqId, execFilter):
-        ex = load_executions()
+        ex = load_executions() # FIXME:
         if ex:
             c = Contract()
             e = Execution()
@@ -367,7 +367,7 @@ class SimClient(Client):
 
     @override
     def reqPositions(self):
-        pos = load_positions()
+        pos = load_positions()  # FIXME:
         if pos: 
             c = Contract()
             self.wrapper.position(account='DU1215439', contract=c, posSize=0, avgCost=0)
@@ -418,144 +418,19 @@ class SimClient(Client):
     @override
     def reqAccountUpdatesMulti(self, reqId, account, modelCode, ledgerAndNLV):
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountCode', val='DU1215439', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountOrGroup', val='DU1215439', currency='AUD', modelCode='')
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountOrGroup', val='DU1215439', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountOrGroup', val='DU1215439', currency='USD', modelCode='')
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountReady', val='true', currency='', modelCode='')
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountType', val='INDIVIDUAL', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccruedCash', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccruedCash', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccruedCash', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccruedCash-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccruedDividend', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccruedDividend-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AvailableFunds', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AvailableFunds-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Billable', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Billable-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='BuyingPower', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='CashBalance', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='CashBalance', val=f'{self.TotalCashValue:.2f}', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='CashBalance', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='ColumnPrio-P', val='5', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='ColumnPrio-S', val='1', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='CorporateBondValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='CorporateBondValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='CorporateBondValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Cryptocurrency', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Cryptocurrency', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Cryptocurrency', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Currency', val='AUD', currency='AUD', modelCode='')
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Currency', val='BASE', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Currency', val='USD', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Cushion', val='1', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='EquityWithLoanValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='EquityWithLoanValue-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='ExcessLiquidity', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='ExcessLiquidity-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='ExchangeRate', val='1', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='ExchangeRate', val='1', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='ExchangeRate', val='0.65', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FullAvailableFunds', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FullAvailableFunds-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FullExcessLiquidity', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FullExcessLiquidity-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FullInitMarginReq', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FullInitMarginReq-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FullMaintMarginReq', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FullMaintMarginReq-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FundValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FundValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FundValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FutureOptionValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FutureOptionValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FutureOptionValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FuturesPNL', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FuturesPNL', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FuturesPNL', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FxCashBalance', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FxCashBalance', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='FxCashBalance', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='GrossPositionValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Guarantee', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Guarantee-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='IndianStockHaircut', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='IndianStockHaircut-P', val='0', currency='AUD', modelCode='')
+        
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='InitMarginReq', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='InitMarginReq-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='IssuerOptionValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='IssuerOptionValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='IssuerOptionValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Leverage-S', val='0', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadAvailableFunds', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadAvailableFunds-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadExcessLiquidity', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadExcessLiquidity-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadInitMarginReq', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadInitMarginReq-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadMaintMarginReq', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadMaintMarginReq-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='LookAheadNextChange', val='1716379200', currency='', modelCode='')
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MaintMarginReq', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MaintMarginReq-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MoneyMarketFundValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MoneyMarketFundValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MoneyMarketFundValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MutualFundValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MutualFundValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MutualFundValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NLVAndMarginInReview', val='false', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetDividend', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetDividend', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetDividend', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetLiquidation', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetLiquidation-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetLiquidationByCurrency', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetLiquidationByCurrency', val=f'{self.TotalCashValue:.2f}', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetLiquidationByCurrency', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='NetLiquidationUncertainty', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='OptionMarketValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='OptionMarketValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='OptionMarketValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='PASharesValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='PASharesValue-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='PhysicalCertificateValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='PhysicalCertificateValue-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='PostExpirationExcess', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='PostExpirationExcess-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='PostExpirationMargin', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='PostExpirationMargin-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='RealCurrency', val='AUD', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='RealCurrency', val='BASE', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='RealCurrency', val='USD', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='RealizedPnL', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='RealizedPnL', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='RealizedPnL', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='SegmentTitle-P', val='Crypto at Paxos', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='SegmentTitle-S', val='CFD', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='StockMarketValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='StockMarketValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='StockMarketValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TBillValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TBillValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TBillValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TBondValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TBondValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TBondValue', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashBalance', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
+
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashBalance', val=f'{self.TotalCashBalance:.2f}', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashBalance', val='0', currency='USD', modelCode='')
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashValue', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashValue-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalDebitCardPendingCharges', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalDebitCardPendingCharges-P', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TradingType-S', val='STKCASH', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='UnrealizedPnL', val='0', currency='AUD', modelCode='')
         self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='UnrealizedPnL', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='UnrealizedPnL', val='0', currency='USD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='WarrantValue', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='WarrantValue', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='WarrantValue', val='0', currency='USD', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='RealizedPnL', val='0', currency='BASE', modelCode='')
+
         self.wrapper.accountUpdateMultiEnd(reqId) 
 
     # def cancelAccountUpdatesMulti(self, reqId):
@@ -735,9 +610,9 @@ class SimClient(Client):
         com = get_commission(c.symbol)
         margin = get_margin(c.symbol)
     
-        unrealizedPNL = 0.0
-        realizedPNL = 0.0
-        closedPos = 0
+        unrealizedPNL = 0.0  # FixMe: Calculate Unrealized PNL
+        realizedPNL = 0.0 # FixMe: Calculate Realized PNL
+        closedPos = 0 # FixMe: Calculate Closed Positions
         newPos = o.totalQuantity 
 
         # Get Current Position if exists
@@ -759,6 +634,7 @@ class SimClient(Client):
         else:
             raise ValueError('Side must be BOT or SLD')
 
+        # FixMe: 
         averageCost   = price
         MarketValue   = price * newPos * c.multiplier
         unrealizedPNL = newPos * (price - position.avgCost) * c.multiplier if position else 0
