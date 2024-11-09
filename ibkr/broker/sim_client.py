@@ -15,30 +15,29 @@ from ib_async import util
 from ib_async.contract import (ComboLeg, Contract, ContractDescription, ContractDetails, DeltaNeutralContract)
 from ib_async.order import BracketOrder, LimitOrder, Order, OrderState, OrderStatus, StopOrder, Trade
 from ib_async.objects import (
-    BarData, CommissionReport, DepthMktDataDescription, Execution, FamilyCode,
+    BarDataList, BarData, CommissionReport, DepthMktDataDescription, Execution, FamilyCode,
     HistogramData, HistoricalSession, HistoricalTick, HistoricalTickBidAsk,
-    HistoricalTickLast, NewsProvider, PriceIncrement, SmartComponent,
+    HistoricalTickLast, NewsProvider, PriceIncrement, Position, SmartComponent,
     SoftDollarTier, TagValue, TickAttribBidAsk, TickAttribLast, ConnectionStats, WshEventData)
 
-from ibkr.broker.sim_portfolio_sim import getAccounts
-from ibkr.broker.sim_contract_sim import load_csv, load_contractDetails, load_openorders, load_positions, load_executions, get_commission, get_margin
+from ibkr.broker.sim_contract_sim import load_db, load_contractDetails, load_openorders, load_positions, load_executions, get_commission, get_margin
 
 
 class SimClient(Client):
     
-    def __init__(self, wrapper):
-        super(SimClient, self).__init__(wrapper)   
+    def __init__(self, wrapper, AccountBalance=100_000.0):
+        super(SimClient, self).__init__(wrapper)  
         self.decoder = None
         self.conn = None
         # Override Settings
         self._serverVersion = 150
         self._apiReady = True
-        self._permIdSeq = 123456000
-        self._execIdSeq = int(0x1_000_000_000)
-        self._accounts = getAccounts()
-        self.TotalCashBalance = 100_000.0
-        self.TotalCashValue = 100_000.0
-        self.TotalDailyProfit = 0.0
+        self._permIdSeq = 1
+        self._execIdSeq = 1
+        self._accounts = ["SimAccount",]
+        self.TotalCashBalance = AccountBalance
+        self._position = 0
+        
 
     @override
     def connectionStats(self) -> ConnectionStats:
@@ -91,8 +90,7 @@ class SimClient(Client):
         except Exception as e: 
             logging.exception("\n\tSimulated Environment\n\tRequested function not implemented\n\tImplement function!!!\nterminating",stack_info=True,stacklevel=2)
         finally:
-            loop = util.getLoop()
-            loop.stop()
+            util.getLoop().stop()
             
 
     # def reqMktData(
@@ -120,24 +118,12 @@ class SimClient(Client):
     #     self.send(2, 2, reqId)
 
     @override
-    def placeOrder(self, orderId, contract, order):
+    def placeOrder(self, orderId, contract:Contract, order: Order):
         pass
 
     @override
-    def cancelOrder(self, orderId, manualCancelOrderTime=''):
-        # try:
-        #     self.pending.remove(order)
-        # except ValueError:
-        #     # If the list didn't have the element we didn't cancel anything
-        #     return False
-
-        # order.cancel()
-        # self.notify(order)
-        # self._ococheck(order)
-        # if not bracket:
-        #     self._bracketize(order, cancel=True)
-        # return True
-        raise NotImplementedError()
+    def cancelOrder(self, orderId, manualCancelOrderTime=""):
+        pass
 
     @override
     def reqOpenOrders(self):
@@ -151,7 +137,7 @@ class SimClient(Client):
 
     @override
     def reqAccountUpdates(self, subscribe, acctCode):
-        self.wrapper.accountDownloadEnd(_account='DU1215439')
+        self.wrapper.accountDownloadEnd(_account=self._accounts[0])
 
     @override   
     def reqExecutions(self, reqId, execFilter):
@@ -217,19 +203,50 @@ class SimClient(Client):
 
     # def replaceFA(self, reqId, faData, cxml):
     #     self.send(19, 1, faData, cxml, reqId)
+    async def historicalDataUpdateAsync(self, reqId: int):
+        for index, row in self._df.iterrows():
+            await asyncio.sleep(0.00001)
+            bar = BarData(
+                    date=str(row.date),
+                    open=float(row.open),
+                    high=float(row.high),
+                    low=float(row.low),
+                    close=float(row.close),
+                    volume=float(row.volume),
+                    average=float(0),
+                    barCount=int(index)
+                )
+            self.wrapper.lastTime = row.date
+            self.wrapper.historicalDataUpdate(reqId, bar)
+        util.getLoop().stop()
 
     @override
     def reqHistoricalData(
             self, reqId, contract, endDateTime, durationStr, barSizeSetting,
             whatToShow, useRTH, formatDate, keepUpToDate, chartOptions):
-        
-        # FIXME: Duration and Bar Size
+        self.commission = get_commission(contract.symbol)
+        # Calculate No of history bars
         d, p = durationStr.split(' ')
+        d = int(d)
+        match p:
+            case 'D':
+                d *= 24*60*60
+            case 'W':
+                d *= 5*24*60*60
+            case 'M':
+                d *= 22*24*60*60
         t, s = barSizeSetting.split(' ')
         t = int(t)
-        n = int(d) * t * 60 * 24
+        match s:
+            case 'min' | 'mins':
+                t *= 60
+            case 'hour' | 'hours':
+                t *= 60 * 60
+            case 'day' | 'days':
+                t *= 60 * 60 * 24
+        n = d // t
 
-        _df = load_csv(contract.symbol)
+        _df = load_db(contract.symbol, startDateStr='2021-12-13 15:40:40', endDateStr='2021-12-16')
 
         for index, row in _df[:n].iterrows():
             bar = BarData(
@@ -248,11 +265,13 @@ class SimClient(Client):
         self._df = _df[n:]
 
         self.wrapper.lastTime = _df.iloc[n].date
+        self.wrapper.ib.barUpdateEvent += self.update_executions
         if keepUpToDate:
             loop = util.getLoop()
             loop.create_task(self.historicalDataUpdateAsync(reqId))
 
         self.wrapper.historicalDataEnd(int(reqId), startDateStr, endDateStr)
+
 
     # def exerciseOptions(
     #         self, reqId, contract, exerciseAction,
@@ -370,7 +389,7 @@ class SimClient(Client):
         pos = load_positions()  # FIXME:
         if pos: 
             c = Contract()
-            self.wrapper.position(account='DU1215439', contract=c, posSize=0, avgCost=0)
+            self.wrapper.position(account=self._accounts[0], contract=c, posSize=0, avgCost=0)
         self.wrapper.positionEnd()
 
     # def reqAccountSummary(self, reqId, groupName, tags):
@@ -417,19 +436,18 @@ class SimClient(Client):
 
     @override
     def reqAccountUpdatesMulti(self, reqId, account, modelCode, ledgerAndNLV):
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountCode', val='DU1215439', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountOrGroup', val='DU1215439', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountReady', val='true', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='AccountType', val='INDIVIDUAL', currency='', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='Currency', val='BASE', currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='AccountCode', val=self._accounts[0], currency='', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='AccountOrGroup', val=self._accounts[0], currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='AccountReady', val='true', currency='', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='AccountType', val='INDIVIDUAL', currency='', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='Currency', val='BASE', currency='BASE', modelCode='')
         
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='InitMarginReq', val='0', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='MaintMarginReq', val='0', currency='AUD', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='InitMarginReq', val='0', currency='AUD', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='MaintMarginReq', val='0', currency='AUD', modelCode='')
 
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashBalance', val=f'{self.TotalCashBalance:.2f}', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashValue', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='UnrealizedPnL', val='0', currency='BASE', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='RealizedPnL', val='0', currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='TotalCashBalance', val=f'{self.TotalCashBalance:.2f}', currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='UnrealizedPnL', val='0', currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='RealizedPnL', val='0', currency='BASE', modelCode='')
 
         self.wrapper.accountUpdateMultiEnd(reqId) 
 
@@ -554,23 +572,6 @@ class SimClient(Client):
 
     # def reqUserInfo(self, reqId):
     #     self.send(104, reqId)
-
-    
-    async def historicalDataUpdateAsync(self, reqId: int):
-        for index, row in self._df.iterrows():
-            await asyncio.sleep(0)
-            bar = BarData(
-                    date=str(row.date),
-                    open=float(row.open),
-                    high=float(row.high),
-                    low=float(row.low),
-                    close=float(row.close),
-                    volume=float(row.volume),
-                    average=float(0),
-                    barCount=int(index)
-                )
-            self.wrapper.lastTime = row.date
-            self.wrapper.historicalDataUpdate(reqId, bar)
             
     def getpermId(self) -> int:
         """Get new Perm ID."""
@@ -587,142 +588,135 @@ class SimClient(Client):
         newId = self._execIdSeq
         self._execIdSeq += 1
         return newId
-    
-    def updateOrder(self, trade):
-        trade.orderStatus.status = 'Submitted'
-        
 
-    def modifyOrder(self, trade):
-        self._logger.debug('orderModifyEvent: Not Implemented')
-        raise NotImplementedError()
-
-
-            
-    def do_execution(self, trade, price, side):
-        account = self._accounts[0]
-        reqId = self.getReqId()
-        execId = self.getexecId()
-        c: Contract = trade.contract
-        o: Order = trade.order
-        os: OrderStatus = trade.orderStatus
-        pos = self.wrapper.positions[account]
-        
-        com = get_commission(c.symbol)
-        margin = get_margin(c.symbol)
-    
-        unrealizedPNL = 0.0  # FixMe: Calculate Unrealized PNL
-        realizedPNL = 0.0 # FixMe: Calculate Realized PNL
-        closedPos = 0 # FixMe: Calculate Closed Positions
-        newPos = o.totalQuantity 
-
+    def do_updateportfolio(self, price: float):
+        dailyPnL = 0.0
+        realizedPNL = 0.0
+        unrealizedPNL = 0.0
+        marketValue = 0.0
         # Get Current Position if exists
-        position = pos.get(c.conId)
-        curPos = position.position if position else 0
-        # Check if we are closing or we are reversing positions.
-        if side == 'BOT':
-            if curPos > 0:
-                newPos += curPos
-            if curPos < 0:  # We have closed or reversed positions.
-                closedPos = min(newPos, curPos)
-                newPos += curPos
-        elif side == 'SLD':
-            if curPos < 0:
-                newPos -= curPos
-            if curPos > 0:  # We have closed or reversed positions.
-                closedPos = min(newPos, curPos)
-                newPos -= curPos
-        else:
-            raise ValueError('Side must be BOT or SLD')
+        positions = self.wrapper.positions[self._accounts[0]]
+        for key in positions:
+            curPos = positions[key]
+            if curPos:
+                unrealizedPNL += abs(curPos.position) * (price - curPos.avgCost) * curPos.contract.multiplier
+                realizedPNL += 0.0
+                marketValue += abs(curPos.position * price * curPos.contract.multiplier)
+                self.wrapper.updatePortfolio(curPos.contract, abs(curPos.position), 
+                        price , marketValue, curPos.avgCost,
+                        unrealizedPNL, realizedPNL, self._accounts[0])
+                
+                self.TotalCashBalance += unrealizedPNL
+        
+        reqId = self.getReqId()
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='TotalCashBalance', val=f'{self.TotalCashBalance:.2f}', currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='UnrealizedPnL', val=f'{unrealizedPNL}', currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='RealizedPnL', val=f'{realizedPNL}', currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMultiEnd(reqId) 
+        
 
-        # FixMe: 
-        averageCost   = price
-        MarketValue   = price * newPos * c.multiplier
-        unrealizedPNL = newPos * (price - position.avgCost) * c.multiplier if position else 0
-        realizedPNL   = closedPos * (price - position.avgCost) * c.multiplier if position else 0
-
-        ex = Execution(
-                        execId=execId, 
-                        time=self.wrapper.lastTime,  
-                        acctNumber=account, 
-                        exchange=c.exchange, 
-                        side=side, 
-                        shares=o.totalQuantity,
-                        price=price, 
-                        permId=o.permId, 
-                        clientId=self.clientId, 
-                        orderId=o.orderId, 
-                        liquidation=0, 
-                        cumQty=o.totalQuantity, 
-                        avgPrice=averageCost, 
-                        orderRef='', 
-                        evRule='', 
-                        evMultiplier=c.multiplier, 
-                        modelCode='', 
-                        lastLiquidity=1,     
-                    )
-        self.wrapper.execDetails(reqId, c, ex)
-        self.wrapper.execDetailsEnd(reqId=reqId)
-        # Update the order status
+    def do_execution(self, trade, price, side):        
+        realizedPNL = 0.0
+        # Get Current Position if exists
+        position = self.wrapper.positions[self._accounts[0]]
+        curPos = position.get(trade.contract.conId) or Position(self._accounts[0], trade.contract, 0, 0.0)
+        
+        s = -1 if side == "SLD" else 1
         self.wrapper.orderStatus(
-                        orderId=os.orderId, 
+                        orderId=trade.order.orderId, 
                         status=OrderStatus.Filled, 
-                        filled=o.totalQuantity, 
+                        filled=s*trade.order.totalQuantity, 
                         remaining=0, 
                         avgFillPrice=price, 
-                        permId=o.permId, 
+                        permId=trade.order.permId, 
                         parentId=0, 
                         lastFillPrice=price, 
                         clientId=self.wrapper.clientId,
                         whyHeld='', 
                         mktCapPrice=0.0
                     )
-        # Update the position
-        self.wrapper.position(account, c, newPos, price)
-        self.wrapper.positionEnd()
-        # Generate a commission report
-        cr = CommissionReport(execId=ex.execId,
-                              commission=com * o.totalQuantity, 
-                              currency=c.currency, 
+
+        newPos = curPos.position + s*trade.order.totalQuantity
+        newAvgPrice = trade.orderStatus.avgFillPrice
+        if (trade.orderStatus.filled + curPos.position): # adding to position 
+            newAvgPrice = (trade.orderStatus.filled * trade.orderStatus.avgFillPrice + curPos.avgCost * curPos.position) / (trade.orderStatus.filled  + curPos.position)
+        else: # Closing  Position
+            realizedPNL = (trade.orderStatus.filled * trade.orderStatus.avgFillPrice - curPos.position * curPos.avgCost) * trade.contract.multiplier 
+        
+        reqId = self.getReqId()
+        execId = self.getexecId()
+        ex = Execution(
+                        execId=execId, 
+                        time=self.wrapper.lastTime,
+                        acctNumber=self._accounts[0], 
+                        exchange=trade.contract.exchange, 
+                        side=side, 
+                        shares=trade.orderStatus.filled,
+                        price=price, 
+                        permId=trade.order.permId, 
+                        clientId=self.clientId, 
+                        orderId=trade.order.orderId, 
+                        liquidation=0, 
+                        cumQty=trade.orderStatus.filled, 
+                        avgPrice=price, 
+                        orderRef='', 
+                        evRule='', 
+                        evMultiplier=trade.contract.multiplier, 
+                        modelCode='', 
+                        lastLiquidity=1,     
+                    )
+        self.wrapper.execDetails(reqId, trade.contract, ex)
+        self.wrapper.execDetailsEnd(reqId=reqId) 
+        comm = CommissionReport(execId=execId,
+                              commission= self.commission * abs(trade.orderStatus.filled), 
+                              currency=trade.contract.currency, 
                               realizedPNL=realizedPNL, 
                               yield_=0.0, 
                               yieldRedemptionDate=0
                             )
-        self.wrapper.commissionReport(cr)     
-        # Update the Account
-        self.TotalCashValue = self.TotalCashValue + realizedPNL + unrealizedPNL - com*closedPos 
-        self.TotalCashBalance = self.TotalCashValue - newPos * margin 
         
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashValue', val=f'{self.TotalCashValue:.2f}', currency='AUD', modelCode='')
-        self.wrapper.accountUpdateMulti(reqId=reqId, account='DU1215439', tag='TotalCashBalance', val=f'{self.TotalCashBalance:.2f}', currency='AUD', modelCode='')
-        # Update the portfolio
-        self.wrapper.updatePortfolio(c, newPos, price, MarketValue,  averageCost, unrealizedPNL, realizedPNL, account)
-        # Update PNL
-        self.wrapper.pnlSingle(reqId, newPos, self.TotalDailyProfit, unrealizedPNL, realizedPNL, MarketValue )
+        # self.wrapper.completedOrder(contract=trade.contract, order=trade.order, orderState=OrderState(status=OrderStatus.Filled))
+        # self.wrapper.completedOrdersEnd()
+        self.wrapper.commissionReport(comm)
+        fill = self.wrapper.fills.get(comm.execId)
+        report = util.dataclassUpdate(fill.commissionReport, comm)
+        
+        self.wrapper.position(self._accounts[0], trade.contract, newPos, newAvgPrice)
+        self.wrapper.positionEnd()
         
 
+        self.TotalCashBalance -= comm.commission
+        self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='TotalCashBalance', val=f'{self.TotalCashBalance:.2f}', currency='BASE', modelCode='')
+        self.wrapper.accountUpdateMultiEnd(reqId) 
+        self.wrapper.ib.commissionReportEvent.emit(trade, fill, report)
 
-    def update_executions(self, bar: BarData):
-        for key, trade in self.wrapper.trades.items():
-            if trade.orderStatus.status == OrderStatus.Submitted:
-                match trade.order.action:
-                    case "BUY":
-                        match trade.order.orderType:
-                            case "MKT":
-                                self.do_execution(trade, bar.close, 'BOT')
-                            case "LMT":
-                                if trade.order.lmtPrice <= bar.high:
-                                    self.do_execution(trade, trade.order.lmtPrice, 'BOT')
-                            case "STP LMT":
-                                if trade.order.auxLmtPrice <= bar.high:
-                                    self.do_execution(trade, trade.order.auxLmtPrice, 'BOT')
-                    case "SELL":
-                        match trade.order.orderType:
-                            case "MKT":
-                                self.do_execution(trade, bar.close, 'SLD')
-                            case "LMT":
-                                if trade.order.lmtPrice >= bar.low:
-                                    self.do_execution(trade, trade.order.lmtPrice, 'SLD')
-                            case "STP LMT":
-                                if trade.order.auxLmtPrice >= bar.low:
-                                    self.do_execution(trade, trade.order.auxLmtPrice, 'SLD')
-                    
+        # self._logger.info(f"executed: {self.wrapper.lastTime} \t{side} {trade.order.totalQuantity}@{trade.orderStatus.avgFillPrice:.2f}  Position={newPos}")
+
+
+
+    def update_executions(self, bars: BarDataList, hasNewBar:bool):
+        trades = [v for v in self.wrapper.trades.values() if v.orderStatus.status == OrderStatus.Submitted and v.orderStatus.status not in OrderStatus.DoneStates]
+        for trade in trades:
+            match trade.order.action:
+                case "BUY":
+                    match trade.order.orderType:
+                        case "MKT":
+                            self.do_execution(trade, bars[-1].open, 'BOT')
+                        case "LMT":
+                            if trade.order.lmtPrice <= bars[-1].high:
+                                self.do_execution(trade, trade.order.lmtPrice, 'BOT')
+                        case "STP LMT":
+                            if trade.order.auxLmtPrice <= bars[-1].high:
+                                self.do_execution(trade, trade.order.auxLmtPrice, 'BOT')
+                case "SELL":
+                    match trade.order.orderType:
+                        case "MKT":
+                            self.do_execution(trade, bars[-1].open, 'SLD')
+                        case "LMT":
+                            if trade.order.lmtPrice >= bars[-1].low:
+                                self.do_execution(trade, trade.order.lmtPrice, 'SLD')
+                        case "STP LMT":
+                            if trade.order.auxLmtPrice >= bars[-1].low:
+                                self.do_execution(trade, trade.order.auxLmtPrice, 'SLD')
+
+        self.do_updateportfolio(bars[-1].close)

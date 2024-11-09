@@ -19,6 +19,7 @@ sizeIncrement = 1
 initMargin = 19440.66
 commission = 3.5
 filename = '6A_cc.csv'
+dbname = 'trading_data.sqlite'
 
 [CL]
 symbol = 'CLN4'
@@ -41,6 +42,7 @@ sizeIncrement = 1
 initMargin = 19440.66
 commission = 3.5
 filename = 'CL_cc.csv'
+dbname = 'trading_data.sqlite'
 
 [ES]
 symbol = 'ES'
@@ -63,4 +65,5 @@ sizeIncrement = 1
 initMargin = 19440.66
 commission = 3.5
 filename = 'ES_cc.csv'
+dbname = 'trading_data.sqlite'
 

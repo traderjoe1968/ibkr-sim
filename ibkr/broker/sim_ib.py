@@ -6,17 +6,20 @@ from ibkr.broker.sim_client import SimClient
 
 
 class IBSim(IB):
-    def __init__(self):
+    def __init__(self, AccountBalance):
         super(IBSim, self).__init__()
-        self.client = SimClient(self.wrapper) 
+        self.client = SimClient(self.wrapper, AccountBalance=100_000.0) 
 
-        self.newOrderEvent += self.onNewOrderEvent
-        self.orderModifyEvent += self.onOrderModifyEvent
+        self.newOrderEvent += self.do_updateOrder
+        self.orderModifyEvent += self.do_modifyOrder
+        self.cancelOrderEvent += self.do_cancelOrder
      
-    
-    def onNewOrderEvent(self, trade: Trade):
-        self.client.updateOrder(trade)
+    def do_cancelOrder(self, trade:Trade):
+        trade.orderStatus.status = OrderStatus.Cancelled
 
-    def onOrderModifyEvent(self, trade: Trade):
-        self.client.modifyOrder(trade)
-    
+    def do_updateOrder(self, trade:Trade):
+        trade.orderStatus.status = OrderStatus.Submitted      
+
+    def do_modifyOrder(self, trade:Trade):
+        self._logger.error('orderModifyEvent: Not Implemented')
+        raise NotImplementedError()

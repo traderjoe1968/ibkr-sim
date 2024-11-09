@@ -2,6 +2,7 @@
 import os
 import tomllib
 import pandas as pd
+import sqlite3
 from functools import cache
 from dataclasses import dataclass, field
 from typing import List, NamedTuple, Optional
@@ -79,7 +80,27 @@ def load_csv(symbol: str) -> pd.DataFrame:
     # df = _df.set_index('date')
     return _df
             
-    
+
+def load_db(symbol: str, startDateStr:str='', endDateStr:str='') -> pd.DataFrame:
+    try:
+        dbname = os.path.join(DATA_DIR,_contracts[symbol]["dbname"])
+        conn = sqlite3.connect(dbname)
+        query = f"SELECT datetime as date, open, high, low, close, volume FROM tbl_5min_data where ticker='{symbol}'"
+        if startDateStr and endDateStr:
+            query += f" and datetime between '{startDateStr}' and '{endDateStr}'"
+        elif startDateStr:
+            query += f" and datetime >= '{startDateStr}'"
+        elif endDateStr:
+            query += f" and datetime <= '{endDateStr}'"
+            
+        _df = pd.read_sql_query(query, conn)
+        conn.close()
+        
+    except KeyError:
+        raise ValueError(f"Contract {symbol} not found in contracts.toml")
+
+    return _df
+
 def load_openorders():
     # TODO : implement load of open orders from DB 
     return {}
