@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from pandas import DataFrame
 from datetime import datetime
 from dataclasses import dataclass, field
 from ib_async import IB, util, Position, Trade, Fill, CommissionReport
@@ -24,7 +25,7 @@ logger.addHandler(handler)
 # util.logToConsole(logger.ERROR)
 
 
-class Brokers():
+class Trader():
 
     def __init__(self, AccountBalance=100_000.0):
         self.ib = IBSim(AccountBalance)
@@ -47,10 +48,11 @@ class Brokers():
                                     'entry_price': pd.Series(dtype=float),
                                     'exit_dt': pd.Series(dtype=str),
                                     'exit_price': pd.Series(dtype=float),
+                                    'bars': pd.Series(dtype=int),
                                     'profit': pd.Series(dtype=float),
-                                    'cumprofit': pd.Series(dtype=float),
-                                    'bars': pd.Series(dtype=int)
                                 })
+        # Stats Parameters
+        self.risk_free_rate = 5.0  # Set the risk-free rate (optional)
 
     def on_execution(self, trade: Trade, fill: Fill, report: CommissionReport):
         def open_position(ticker, side, qty, price, dt, commission):
@@ -63,9 +65,8 @@ class Brokers():
                 'entry_price': price,
                 'exit_dt': "",
                 'exit_price': 0,
+                'bars': 0,
                 'profit': -commission,
-                'cumprofit':0,
-                'bars': 0
             }])
             self.trade_results = pd.concat([ self.trade_results, df], ignore_index=True)
             self.in_trade = qty
@@ -76,8 +77,7 @@ class Brokers():
             self.trade_results.loc[current_position.index, 'exit_price'] = price
             self.trade_results.loc[current_position.index, 'profit'] += current_position['qty'] * (price - current_position['entry_price'])*multiplier - commission * current_position['qty']
             self.trade_results.loc[current_position.index, 'bars'] = self.trade_bars
-            self.trade_results['cumprofit'] = self.trade_results['profit'].cumsum()
-            self.in_trade = 0
+            self.in_trade = 0            
 
         side = -1 if fill.execution.side == "SLD" else 1
         current_position = self.trade_results[(self.trade_results['ticker'] == fill.contract.symbol) & (self.trade_results['exit_dt'] == "") & (self.trade_results['exit_price'] == 0)]
@@ -122,8 +122,12 @@ class Brokers():
 
 
     def update_stats(self, bars):
+        
+
+
         if abs(self.in_trade) > 0:
             self.trade_bars += 1
+        
             
         pass
 
@@ -164,7 +168,7 @@ class Brokers():
         #             running = False
         #             pygame.quit()
 
-broker = Brokers()
+broker = Trader()
 
 if __name__ == "__main__":
     try:
