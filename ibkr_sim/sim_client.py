@@ -1,12 +1,14 @@
 """Socket client for communicating with Interactive Brokers."""
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+import dateutil
 import logging
 import time
 from collections import deque
 from typing import Deque, Awaitable, Dict, Iterator, List, Optional, Union, override
 
+import dateutil.parser
 from eventkit import Event
 
 from ib_async.client import Client
@@ -20,7 +22,7 @@ from ib_async.objects import (
     HistoricalTickLast, NewsProvider, PriceIncrement, Position, SmartComponent,
     SoftDollarTier, TagValue, TickAttribBidAsk, TickAttribLast, ConnectionStats, WshEventData)
 
-from ibkr.broker.sim_contract_sim import load_db, load_contractDetails, load_openorders, load_positions, load_executions, get_commission, get_margin
+from ibkr_sim.sim_contract_sim import load_db, load_contractDetails, load_openorders, load_positions, load_executions, get_commission, get_margin
 
 
 class SimClient(Client):
@@ -244,10 +246,11 @@ class SimClient(Client):
                 t *= 60 * 60
             case 'day' | 'days':
                 t *= 60 * 60 * 24
-        n = d // t
 
-        _df = load_db(contract.symbol, startDateStr='2021-12-13 15:40:40', endDateStr='2021-12-16')
-
+        startDateTime = (dateutil.parser.parse(endDateTime)- timedelta(seconds=d)).strftime("%Y-%m-%d")
+        _df = load_db(contract.symbol, startDateStr=startDateTime, endDateStr=endDateTime)
+        # FIXME: Should not be hard coded but based on max strategy bars needed
+        n=100
         for index, row in _df[:n].iterrows():
             bar = BarData(
                 date=str(row.date),
@@ -259,18 +262,15 @@ class SimClient(Client):
                 average=float(0),
                 barCount=int(index))                  
             self.wrapper.historicalData(int(reqId), bar)
-        startDateStr = str(_df.iloc[0].date)
-        endDateStr = str(_df.iloc[n-1].date)
+            self.wrapper.lastTime = bar.date
 
         self._df = _df[n:]
-
-        self.wrapper.lastTime = _df.iloc[n].date
         self.wrapper.ib.barUpdateEvent += self.update_executions
         if keepUpToDate:
             loop = util.getLoop()
             loop.create_task(self.historicalDataUpdateAsync(reqId))
 
-        self.wrapper.historicalDataEnd(int(reqId), startDateStr, endDateStr)
+        self.wrapper.historicalDataEnd(int(reqId), None, None)
 
 
     # def exerciseOptions(
@@ -605,8 +605,6 @@ class SimClient(Client):
                 self.wrapper.updatePortfolio(curPos.contract, abs(curPos.position), 
                         price , marketValue, curPos.avgCost,
                         unrealizedPNL, realizedPNL, self._accounts[0])
-                
-                self.TotalCashBalance += unrealizedPNL
         
         reqId = self.getReqId()
         self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='TotalCashBalance', val=f'{self.TotalCashBalance:.2f}', currency='BASE', modelCode='')
@@ -615,17 +613,53 @@ class SimClient(Client):
         self.wrapper.accountUpdateMultiEnd(reqId) 
         
 
-    def do_execution(self, trade, price, side):        
+    def do_execution(self, trade, price):        
         realizedPNL = 0.0
-        # Get Current Position if exists
-        position = self.wrapper.positions[self._accounts[0]]
-        curPos = position.get(trade.contract.conId) or Position(self._accounts[0], trade.contract, 0, 0.0)
-        
-        s = -1 if side == "SLD" else 1
+        newAvgPrice = 0.0
+
+        side = -1 if trade.order.action == "SELL" else 1
+
+        positions = self.wrapper.positions[self._accounts[0]]
+        current_position = positions.get(trade.contract.conId) or Position(self._accounts[0], trade.contract, 0, 0.0)
+        new_position_size = side * trade.order.totalQuantity 
+        newAvgPrice = price
+
+        if current_position.position == 0:
+           pass      
+        else:
+            # Close existing trade
+            if new_position_size == -current_position.position: 
+                if trade.order.action == "SELL":
+                    realizedPNL = trade.order.totalQuantity * (price - current_position.avgCost) * trade.contract.multiplier 
+                else:
+                    realizedPNL = trade.order.totalQuantity * (current_position.avgCost - price) * trade.contract.multiplier 
+                new_position_size = 0 
+            # Add to existing position
+            elif new_position_size + current_position.position > 0 and new_position_size * current_position.position > 0: 
+                newAvgPrice = (trade.orderStatus.filled * trade.orderStatus.avgFillPrice + current_position.avgCost * current_position.position) / (trade.orderStatus.filled  + current_position.position)
+                new_position_size = new_position_size + current_position.position
+            # Reducing to existing position
+            elif abs(new_position_size) < abs(current_position.position) and new_position_size * current_position.position < 0:
+                if trade.order.action == "SELL":
+                    realizedPNL = trade.order.totalQuantity * (price - current_position.avgCost) * trade.contract.multiplier 
+                else:
+                    realizedPNL = trade.order.totalQuantity * (current_position.avgCost - price) * trade.contract.multiplier 
+                newAvgPrice = current_position.avgCost
+                new_position_size = new_position_size + current_position.position         
+            # Reverse existing position
+            elif abs(new_position_size) > abs(current_position.position) and new_position_size * current_position.position < 0:
+                if trade.order.action == "SELL":
+                    realizedPNL = abs(current_position.position) * (price - current_position.avgCost) * trade.contract.multiplier 
+                else:
+                    realizedPNL = abs(current_position.position) * (current_position.avgCost - price) * trade.contract.multiplier 
+                newAvgPrice = price
+                new_position_size = new_position_size + current_position.position
+                 
+
         self.wrapper.orderStatus(
                         orderId=trade.order.orderId, 
                         status=OrderStatus.Filled, 
-                        filled=s*trade.order.totalQuantity, 
+                        filled=side * trade.order.totalQuantity, 
                         remaining=0, 
                         avgFillPrice=price, 
                         permId=trade.order.permId, 
@@ -635,14 +669,6 @@ class SimClient(Client):
                         whyHeld='', 
                         mktCapPrice=0.0
                     )
-
-        newPos = curPos.position + s*trade.order.totalQuantity
-        newAvgPrice = trade.orderStatus.avgFillPrice
-        if (trade.orderStatus.filled + curPos.position): # adding to position 
-            newAvgPrice = (trade.orderStatus.filled * trade.orderStatus.avgFillPrice + curPos.avgCost * curPos.position) / (trade.orderStatus.filled  + curPos.position)
-        else: # Closing  Position
-            realizedPNL = (trade.orderStatus.filled * trade.orderStatus.avgFillPrice - curPos.position * curPos.avgCost) * trade.contract.multiplier 
-        
         reqId = self.getReqId()
         execId = self.getexecId()
         ex = Execution(
@@ -650,7 +676,7 @@ class SimClient(Client):
                         time=self.wrapper.lastTime,
                         acctNumber=self._accounts[0], 
                         exchange=trade.contract.exchange, 
-                        side=side, 
+                        side="SLD" if trade.order.action == "SELL" else "BOT", 
                         shares=trade.orderStatus.filled,
                         price=price, 
                         permId=trade.order.permId, 
@@ -681,16 +707,16 @@ class SimClient(Client):
         fill = self.wrapper.fills.get(comm.execId)
         report = util.dataclassUpdate(fill.commissionReport, comm)
         
-        self.wrapper.position(self._accounts[0], trade.contract, newPos, newAvgPrice)
+        self.wrapper.position(self._accounts[0], trade.contract, new_position_size, newAvgPrice)
         self.wrapper.positionEnd()
         
 
-        self.TotalCashBalance -= comm.commission
+        self.TotalCashBalance += realizedPNL - comm.commission
         self.wrapper.accountUpdateMulti(reqId=reqId, account=self._accounts[0], tag='TotalCashBalance', val=f'{self.TotalCashBalance:.2f}', currency='BASE', modelCode='')
         self.wrapper.accountUpdateMultiEnd(reqId) 
         self.wrapper.ib.commissionReportEvent.emit(trade, fill, report)
 
-        # self._logger.info(f"executed: {self.wrapper.lastTime} \t{side} {trade.order.totalQuantity}@{trade.orderStatus.avgFillPrice:.2f}  Position={newPos}")
+        # self._logger.info(f"executed: {self.wrapper.lastTime} \t{"SLD" if trade.order.action == "SELL" else "BOT"} {trade.order.totalQuantity}@{trade.orderStatus.avgFillPrice:.2f}  Position={newPos}")
 
 
 
@@ -701,22 +727,22 @@ class SimClient(Client):
                 case "BUY":
                     match trade.order.orderType:
                         case "MKT":
-                            self.do_execution(trade, bars[-1].open, 'BOT')
+                            self.do_execution(trade, bars[-1].open)
                         case "LMT":
                             if trade.order.lmtPrice <= bars[-1].high:
-                                self.do_execution(trade, trade.order.lmtPrice, 'BOT')
+                                self.do_execution(trade, trade.order.lmtPrice)
                         case "STP LMT":
                             if trade.order.auxLmtPrice <= bars[-1].high:
-                                self.do_execution(trade, trade.order.auxLmtPrice, 'BOT')
+                                self.do_execution(trade, trade.order.auxLmtPrice)
                 case "SELL":
                     match trade.order.orderType:
                         case "MKT":
-                            self.do_execution(trade, bars[-1].open, 'SLD')
+                            self.do_execution(trade, bars[-1].open)
                         case "LMT":
                             if trade.order.lmtPrice >= bars[-1].low:
-                                self.do_execution(trade, trade.order.lmtPrice, 'SLD')
+                                self.do_execution(trade, trade.order.lmtPrice)
                         case "STP LMT":
                             if trade.order.auxLmtPrice >= bars[-1].low:
-                                self.do_execution(trade, trade.order.auxLmtPrice, 'SLD')
+                                self.do_execution(trade, trade.order.auxLmtPrice)
 
         self.do_updateportfolio(bars[-1].close)
