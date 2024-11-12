@@ -6,12 +6,11 @@ from dataclasses import dataclass, field
 from ib_async import IB, util, Position, Trade, Fill, CommissionReport
 from ib_async.order import LimitOrder, Order, OrderStatus, StopOrder, MarketOrder
 
-from ibkr.broker.sim_ib import IBSim
-from ibkr.broker.sim_contract_sim import load_contract
-
-from ibkr.broker.sim_contract_sim import load_csv
-
-from ibkr.strategy.stoch_k import stoch_k, Signals
+from ibkr_sim.sim_ib import IBSim
+from ibkr_sim.sim_contract_sim import load_contract
+from ibkr_sim.sim_contract_sim import load_csv
+from strategy.stoch_k import stoch_k, Signals
+import stats
 
 import logging
 logger = logging.getLogger()
@@ -53,6 +52,15 @@ class Trader():
                                 })
         # Stats Parameters
         self.risk_free_rate = 5.0  # Set the risk-free rate (optional)
+        # self.orderList = [ MarketOrder('BUY', 1),  MarketOrder('SELL', 1), # Close Long
+        #                    MarketOrder('SELL', 1), MarketOrder('BUY', 1), # Close Short
+        #                    MarketOrder('BUY', 1),  MarketOrder('BUY', 1), MarketOrder('SELL', 2), # Add to position then Close
+        #                    MarketOrder('SELL', 2),  MarketOrder('BUY', 1), MarketOrder('BUY', 1), # Reduce Position then close
+        #                    MarketOrder('BUY', 3), MarketOrder('SELL', 4), MarketOrder('BUY', 1), # Reverse Long Position to Short
+        #                    MarketOrder('SELL', 2), MarketOrder('SELL', 1),MarketOrder('BUY', 4), # Short add then reverse
+        #                    MarketOrder('SELL', 1), # Close
+        #              ]
+        # self.count = 0
 
     def on_execution(self, trade: Trade, fill: Fill, report: CommissionReport):
         def open_position(ticker, side, qty, price, dt, commission):
@@ -75,28 +83,50 @@ class Trader():
         def close_position(current_position, price, dt, commission, multiplier):
             self.trade_results.loc[current_position.index, 'exit_dt'] = dt
             self.trade_results.loc[current_position.index, 'exit_price'] = price
-            self.trade_results.loc[current_position.index, 'profit'] += current_position['qty'] * (price - current_position['entry_price'])*multiplier - commission * current_position['qty']
+            self.trade_results.loc[current_position.index, 'profit'] -= commission
+            if self.trade_results.loc[current_position.index, 'qty'].item() < 0:
+                self.trade_results.loc[current_position.index, 'profit'] += (self.trade_results.loc[current_position.index, 'entry_price']  - price)*multiplier
+            else:
+                self.trade_results.loc[current_position.index, 'profit'] += (price - self.trade_results.loc[current_position.index, 'entry_price'])*multiplier
             self.trade_results.loc[current_position.index, 'bars'] = self.trade_bars
-            self.in_trade = 0            
+                        
+
+        def add_position(current_position, qty, price, commission):
+            newAvgEntryPrice = (qty * price + self.trade_results.loc[current_position.index, 'qty']*self.trade_results.loc[current_position.index, 'entry_price']) / (qty + self.trade_results.loc[current_position.index, 'qty'])
+            self.trade_results.loc[current_position.index, 'entry_price'] = newAvgEntryPrice
+            self.trade_results.loc[current_position.index, 'qty'] += qty
+            self.trade_results.loc[current_position.index, 'profit'] -= commission
+
 
         side = -1 if fill.execution.side == "SLD" else 1
         current_position = self.trade_results[(self.trade_results['ticker'] == fill.contract.symbol) & (self.trade_results['exit_dt'] == "") & (self.trade_results['exit_price'] == 0)]
-        new_position_size = side * fill.execution.cumQty
+        new_position_size = fill.execution.cumQty
         if current_position.empty:
             open_position(fill.contract.symbol, side, fill.execution.cumQty, fill.execution.avgPrice, fill.execution.time, report.commission)
         else:
-            if new_position_size * side == -current_position.iloc[-1]['qty']:
+            if new_position_size == -current_position.iloc[-1]['qty']:
                 # New position would close existing trade
                 close_position(current_position, fill.execution.avgPrice, fill.execution.time, report.commission, self.contract.multiplier)
-            elif abs(new_position_size) > abs(current_position.iloc[-1]['qty']) and side != np.sign(current_position.iloc[-1]['qty']):
-                # Reverse existing position
-                close_position(current_position.iloc, fill.execution.avgPrice, fill.execution.time, report.commission, fill.contract.multiplier)
-                raise NotImplementedError()
-            elif abs(new_position_size) > abs(current_position.iloc[-1]['qty']) and side == np.sign(current_position.iloc[-1]['qty']):
-                # Add to existing position
-                raise NotImplementedError()                              
+                self.in_trade = 0
+            # Add to existing position
+            elif new_position_size  + current_position.iloc[-1]['qty'] > 0 and new_position_size * current_position.iloc[-1]['qty'] > 0: 
+                add_position(current_position, fill.execution.cumQty, fill.execution.avgPrice, report.commission)
+            # Reducing to existing position
+            elif abs(new_position_size) < abs(current_position.iloc[-1]['qty']) and new_position_size * current_position.iloc[-1]['qty'] < 0:
+                comm_per_contract = report.commission / abs(fill.execution.cumQty)
+                new_position = current_position.iloc[0].to_dict()
+                new_position['qty'] = new_position_size + current_position.iloc[-1]['qty']
+                self.trade_results.loc[current_position.index, 'qty'] = fill.execution.cumQty + current_position.iloc[-1]['qty']
+                close_position(current_position, fill.execution.avgPrice, fill.execution.time, abs(fill.execution.cumQty + current_position.iloc[-1]['qty']) * comm_per_contract, self.contract.multiplier) 
+                open_position(fill.contract.symbol, -side, new_position['qty'], new_position['entry_price'], new_position['entry_dt'], abs(new_position['qty'])*comm_per_contract)
+            # Reverse existing position
+            elif abs(new_position_size) > abs(current_position.iloc[-1]['qty']) and new_position_size * current_position.iloc[-1]['qty'] < 0:
+                comm_per_contract = report.commission / abs(fill.execution.cumQty)
+                newQty = fill.execution.cumQty + current_position.iloc[-1]['qty']
+                close_position(current_position, fill.execution.avgPrice, fill.execution.time, abs(current_position.iloc[-1]['qty']) * comm_per_contract, self.contract.multiplier) 
+                open_position(fill.contract.symbol, side, newQty, fill.execution.avgPrice, fill.execution.time, abs(newQty) * comm_per_contract)
         pass
-    
+
 
     def check_strategy(self, bars):
         qty = 1
@@ -118,6 +148,10 @@ class Trader():
             elif self.strategy.signal == Signals.COVER:
                 order = MarketOrder('BUY', qty, goodAfterTime=bars[-1].date)
                 self.trade = self.ib.placeOrder(self.contract, order)
+        # if self.count % 8 and len(self.orderList):
+        #     order = self.orderList.pop(0)
+        #     self.trade = self.ib.placeOrder(self.contract, order)
+        # self.count +=1
 
 
 
@@ -138,8 +172,8 @@ class Trader():
     def run(self):
         # session_type = SessionType.LIVE
         bars = self.ib.reqHistoricalData(self.contract, 
-                                    endDateTime='', 
-                                    durationStr='30000 S', 
+                                    endDateTime='2021-12-16', 
+                                    durationStr='30 D', 
                                     barSizeSetting='5 mins', 
                                     whatToShow='TRADES', 
                                     useRTH=False, 
@@ -156,7 +190,14 @@ class Trader():
         pd.set_option('display.width', 1000)        # Set width of display to avoid line wrapping
         pd.set_option('display.colheader_justify', 'center')  # Center column headers
         logger.info(self.trade_results)
-        logger.info("==== Done ====")
+        logger.info(f"Starting Capital=$100000.00\t Ending Capital=${self.ib.client.TotalCashBalance:.2f}\t Profit={self.ib.client.TotalCashBalance-100000}")
+        logger.info(f"TotalProfit={stats.TotalProfit(self.trade_results):.2f}\t AvgProfitLoss={stats.AvgProfitLoss(self.trade_results):.2f}")
+        logger.info(f"WinRatio={stats.WinRatio(self.trade_results):.2f}\t MaxSystemDrawdown={stats.MaxSystemDrawdown(self.trade_results):.2f}")
+        logger.info(f"SharpeRatio={stats.SharpeRatio(self.trade_results,5.0):.2f}")
+        logger.info(f"SortinoRatio={stats.SortinoRatio(self.trade_results,5.0):.2f}")
+        logger.info(f"UlcerIndex={stats.UlcerIndex(self.trade_results):.2f}")
+        logger.info(f"ProfitFactor={stats.ProfitFactor(self.trade_results):.2f}")
+        logger.info(f"Expectancy={stats.Expectancy(self.trade_results):.2f}")
         # running = True
         # while running:
         #     # This updates IB-insync:

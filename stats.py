@@ -24,7 +24,7 @@ def separate_trades(trade_results: DataFrame):
 
 def TotalProfit(trade_results:DataFrame):
     total_profit = trade_results['profit'].cumsum() if not trade_results.empty else 0
-    return total_profit
+    return total_profit.iloc[-1]
 
 def AvgProfitLoss(trade_results:DataFrame):
     avg_profit_loss = trade_results['profit'].mean()
@@ -35,11 +35,11 @@ def AvgProfitLossPercent(trade_results:DataFrame):
     trade_results['profit_percent'] = (trade_results['profit'] / trade_results['entry_price']) * 100
     # Calculate the average profit/loss percentage
     avg_profit_loss_percent = trade_results['profit_percent'].mean()
-    return avg_profit_loss_percent
+    return avg_profit_loss_percent.iloc[-1]
 
 def AvgBarsHeld(trade_results:DataFrame):
     avg_bars_held = trade_results['bars'].mean()
-    return avg_bars_held
+    return avg_bars_held.iloc[-1]
 
 def WinRatio(trade_results:DataFrame):
     # Total number of trades
@@ -79,8 +79,12 @@ def ProfitFactor(trade_results: DataFrame):
     total_loss = losing_trades['profit'].sum()
     return total_profit / abs(total_loss) if total_loss != 0 else np.nan
 
-def RiskRewardRatio(trade_results: DataFrame):
+def Expectancy(trade_results: pd.DataFrame):
     winning_trades, losing_trades = separate_trades(trade_results)
-    average_profit = winning_trades['profit'].mean() if len(winning_trades) > 0 else 0
-    average_loss = losing_trades['profit'].mean() if len(losing_trades) > 0 else 0
-    return average_profit / abs(average_loss) if average_loss != 0 else np.nan
+    total_trades = len(trade_results)
+    win_rate = len(winning_trades) / total_trades if total_trades > 0 else 0
+    loss_rate = 1 - win_rate
+    average_win = winning_trades['profit'].mean() if len(winning_trades) > 0 else 0
+    average_loss = abs(losing_trades['profit'].mean()) if len(losing_trades) > 0 else 0
+    expectancy = (win_rate * average_win) - (loss_rate * average_loss)
+    return expectancy
