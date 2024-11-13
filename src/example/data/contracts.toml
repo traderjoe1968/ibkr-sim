@@ -1,0 +1,69 @@
+[AUD]
+symbol = 'AUD'
+conId = 371277216
+tradingClass='6A'
+secType = 'FUT'
+exchange = 'GLOBEX'
+currency = 'USD'
+multiplier = 100000
+marketName = ''
+minTick = 0.0001
+longName = ''
+contractMonth = "['H''M''U''Z']"
+timeZoneId = ''
+tradingHours = ''
+liquidHours = ''
+lastTradeTime = ''
+minSize = 1
+sizeIncrement = 1
+initMargin = 19440.66
+commission = 3.5
+filename = '6A_cc.csv'
+dbname = 'trading_data.sqlite'
+
+[CL]
+symbol = 'CLN4'
+conId = 304037454
+tradingClass='CL'
+secType = 'FUT'
+exchange = 'NYMEX'
+currency = 'USD'
+multiplier = 1000
+marketName = ''
+minTick = 0.01
+longName = ''
+contractMonth = "['H''M''U''Z']"
+timeZoneId = ''
+tradingHours = ''
+liquidHours = ''
+lastTradeTime = ''
+minSize = 1
+sizeIncrement = 1
+initMargin = 19440.66
+commission = 3.5
+filename = 'CL_cc.csv'
+dbname = 'trading_data.sqlite'
+
+[ES]
+symbol = 'ES'
+conId = 551601561
+tradingClass='ES'
+secType = 'FUT'
+exchange = 'CME'
+currency = 'USD'
+multiplier = 50
+marketName = ''
+minTick = 0.25
+longName = ''
+contractMonth = "['H''M''U''Z']"
+timeZoneId = ''
+tradingHours = ''
+liquidHours = ''
+lastTradeTime = ''
+minSize = 1
+sizeIncrement = 1
+initMargin = 19440.66
+commission = 3.5
+filename = 'ES_cc.csv'
+
+
