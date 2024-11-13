@@ -2,7 +2,7 @@
 from ib_async import IB
 from ib_async.order import BracketOrder, LimitOrder, Order, OrderState, OrderStatus, StopOrder, Trade
 
-from src.sim_client import SimClient
+from ibkr_sim.sim_client import SimClient
 
 
 class IBSim(IB):

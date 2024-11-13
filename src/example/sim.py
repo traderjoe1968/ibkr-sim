@@ -10,7 +10,7 @@ from ibkr_sim.sim_ib import IBSim
 from ibkr_sim import stats
 from ibkr_sim.sim_contract_sim import load_contract
 from ibkr_sim.sim_contract_sim import load_csv
-from stoch_k import stoch_k, Signals
+from ibkr_sim.example.stoch_k import stoch_k, Signals
 
 
 import logging
