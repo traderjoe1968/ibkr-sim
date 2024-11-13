@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 from pandas import DataFrame
@@ -7,10 +8,9 @@ from ib_async import IB, util, Position, Trade, Fill, CommissionReport
 from ib_async.order import LimitOrder, Order, OrderStatus, StopOrder, MarketOrder
 
 from ibkr_sim.sim_ib import IBSim
-from ibkr_sim import stats
-from ibkr_sim.sim_contract_sim import load_contract
-from ibkr_sim.sim_contract_sim import load_csv
-from ibkr_sim.example.stoch_k import stoch_k, Signals
+from example import stats
+from example.contract_info import load_db, load_contract
+from example.stoch_k import stoch_k, Signals
 
 
 import logging
@@ -23,18 +23,22 @@ logger.addHandler(handler)
 
 
 # util.logToConsole(logger.ERROR)
-
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), r'example/data')
 
 class Trader():
 
     def __init__(self, AccountBalance=100_000.0):
-        self.ib = IBSim(AccountBalance)
+
+        self.contractDetails = load_contract(filename=os.path.join(DATA_DIR,"contracts.toml"), symbol='ES')
+        df = load_db(dbfilename=os.path.join(DATA_DIR,"trading_data.sqlite"), symbol=self.contractDetails.contract.symbol, startDateStr="2021-12-14", endDateStr="2021-12-16")
+        contract = {self.contractDetails.contract.symbol:{'ContractDetails':self.contractDetails, 'df':df}}
+
+        self.ib = IBSim(ContractData=contract, AccountBalance=AccountBalance)
         self.ib._logger.setLevel(logging.ERROR)
         self.ib.wrapper._logger.setLevel(logging.ERROR)
         self.ib.connect('127.0.0.1', 7497, clientId=1)
 
-        self.contract = load_contract('ES')
-        self.ib.qualifyContracts(self.contract)
+        self.ib.qualifyContracts(self.contractDetails.contract)
         self.ib.commissionReportEvent += self.on_execution
 
         self.strategy = stoch_k()  
@@ -107,7 +111,7 @@ class Trader():
         else:
             if new_position_size == -current_position.iloc[-1]['qty']:
                 # New position would close existing trade
-                close_position(current_position, fill.execution.avgPrice, fill.execution.time, report.commission, self.contract.multiplier)
+                close_position(current_position, fill.execution.avgPrice, fill.execution.time, report.commission, self.contractDetails.contract.multiplier)
                 self.in_trade = 0
             # Add to existing position
             elif new_position_size  + current_position.iloc[-1]['qty'] > 0 and new_position_size * current_position.iloc[-1]['qty'] > 0: 
@@ -118,13 +122,13 @@ class Trader():
                 new_position = current_position.iloc[0].to_dict()
                 new_position['qty'] = new_position_size + current_position.iloc[-1]['qty']
                 self.trade_results.loc[current_position.index, 'qty'] = fill.execution.cumQty + current_position.iloc[-1]['qty']
-                close_position(current_position, fill.execution.avgPrice, fill.execution.time, abs(fill.execution.cumQty + current_position.iloc[-1]['qty']) * comm_per_contract, self.contract.multiplier) 
+                close_position(current_position, fill.execution.avgPrice, fill.execution.time, abs(fill.execution.cumQty + current_position.iloc[-1]['qty']) * comm_per_contract, self.contractDetails.contract.multiplier) 
                 open_position(fill.contract.symbol, -side, new_position['qty'], new_position['entry_price'], new_position['entry_dt'], abs(new_position['qty'])*comm_per_contract)
             # Reverse existing position
             elif abs(new_position_size) > abs(current_position.iloc[-1]['qty']) and new_position_size * current_position.iloc[-1]['qty'] < 0:
                 comm_per_contract = report.commission / abs(fill.execution.cumQty)
                 newQty = fill.execution.cumQty + current_position.iloc[-1]['qty']
-                close_position(current_position, fill.execution.avgPrice, fill.execution.time, abs(current_position.iloc[-1]['qty']) * comm_per_contract, self.contract.multiplier) 
+                close_position(current_position, fill.execution.avgPrice, fill.execution.time, abs(current_position.iloc[-1]['qty']) * comm_per_contract, self.contractDetails.contract.multiplier) 
                 open_position(fill.contract.symbol, side, newQty, fill.execution.avgPrice, fill.execution.time, abs(newQty) * comm_per_contract)
         pass
 
@@ -138,20 +142,20 @@ class Trader():
         if self.in_trade == 0:
             if self.strategy.signal == Signals.BUY:
                 order = MarketOrder('BUY', qty, goodAfterTime=bars[-1].date)
-                self.trade = self.ib.placeOrder(self.contract, order)
+                self.trade = self.ib.placeOrder(self.contractDetails.contract, order)
             elif self.strategy.signal == Signals.SHORT:
                 order = MarketOrder('SELL', qty, goodAfterTime=bars[-1].date)
-                self.trade = self.ib.placeOrder(self.contract, order)
+                self.trade = self.ib.placeOrder(self.contractDetails.contract, order)
         else:
             if self.strategy.signal == Signals.SELL:
                 order = MarketOrder('SELL', qty, goodAfterTime=bars[-1].date)
-                self.trade = self.ib.placeOrder(self.contract, order)
+                self.trade = self.ib.placeOrder(self.contractDetails.contract, order)
             elif self.strategy.signal == Signals.COVER:
                 order = MarketOrder('BUY', qty, goodAfterTime=bars[-1].date)
-                self.trade = self.ib.placeOrder(self.contract, order)
+                self.trade = self.ib.placeOrder(self.contractDetails.contract, order)
         # if self.count % 8 and len(self.orderList):
         #     order = self.orderList.pop(0)
-        #     self.trade = self.ib.placeOrder(self.contract, order)
+        #     self.trade = self.ib.placeOrder(self.contractDetails.contract, order)
         # self.count +=1
 
 
@@ -172,8 +176,8 @@ class Trader():
 
     def run(self):
         # session_type = SessionType.LIVE
-        bars = self.ib.reqHistoricalData(self.contract, 
-                                    endDateTime='2021-12-16', 
+        bars = self.ib.reqHistoricalData(self.contractDetails.contract, 
+                                    endDateTime='', 
                                     durationStr='30 D', 
                                     barSizeSetting='5 mins', 
                                     whatToShow='TRADES', 

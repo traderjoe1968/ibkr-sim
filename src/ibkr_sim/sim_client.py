@@ -22,12 +22,10 @@ from ib_async.objects import (
     HistoricalTickLast, NewsProvider, PriceIncrement, Position, SmartComponent,
     SoftDollarTier, TagValue, TickAttribBidAsk, TickAttribLast, ConnectionStats, WshEventData)
 
-from ibkr_sim.sim_contract_sim import load_db, load_contractDetails, load_openorders, load_positions, load_executions, get_commission, get_margin
-
 
 class SimClient(Client):
     
-    def __init__(self, wrapper, AccountBalance=100_000.0):
+    def __init__(self, wrapper, ContractData, AccountBalance) :
         super(SimClient, self).__init__(wrapper)  
         self.decoder = None
         self.conn = None
@@ -38,7 +36,11 @@ class SimClient(Client):
         self._execIdSeq = 1
         self._accounts = ["SimAccount",]
         self.TotalCashBalance = AccountBalance
+        self._contractData = ContractData
         self._position = 0
+        # FIXME: Need to cater for differnet Contract Classes 
+        # should not be hard-coded
+        self.commission = 3.5
         
 
     @override
@@ -129,12 +131,6 @@ class SimClient(Client):
 
     @override
     def reqOpenOrders(self):
-        oo = load_openorders()  # FIXME:
-        if oo:
-            c = Contract()
-            o = Order()
-            os = OrderStatus()
-            self.wrapper.openOrder(orderId=0, contract=c, order=o, orderState=os)
         self.wrapper.openOrderEnd()
 
     @override
@@ -143,11 +139,6 @@ class SimClient(Client):
 
     @override   
     def reqExecutions(self, reqId, execFilter):
-        ex = load_executions() # FIXME:
-        if ex:
-            c = Contract()
-            e = Execution()
-            self.wrapper.execDetails(reqId, contract=c, execution=e)
         self.wrapper.execDetailsEnd(reqId)
 
     # def reqIds(self, numIds):
@@ -155,7 +146,7 @@ class SimClient(Client):
 
     @override
     def reqContractDetails(self, reqId, contract):
-        cd = load_contractDetails(contract.symbol)
+        cd = self._contractData [contract.symbol]['ContractDetails']
         self.wrapper.contractDetails(int(reqId), contractDetails=cd)
         self.wrapper.contractDetailsEnd(reqId)
 
@@ -226,29 +217,7 @@ class SimClient(Client):
     def reqHistoricalData(
             self, reqId, contract, endDateTime, durationStr, barSizeSetting,
             whatToShow, useRTH, formatDate, keepUpToDate, chartOptions):
-        self.commission = get_commission(contract.symbol)
-        # Calculate No of history bars
-        d, p = durationStr.split(' ')
-        d = int(d)
-        match p:
-            case 'D':
-                d *= 24*60*60
-            case 'W':
-                d *= 5*24*60*60
-            case 'M':
-                d *= 22*24*60*60
-        t, s = barSizeSetting.split(' ')
-        t = int(t)
-        match s:
-            case 'min' | 'mins':
-                t *= 60
-            case 'hour' | 'hours':
-                t *= 60 * 60
-            case 'day' | 'days':
-                t *= 60 * 60 * 24
-
-        startDateTime = (dateutil.parser.parse(endDateTime)- timedelta(seconds=d)).strftime("%Y-%m-%d")
-        _df = load_db(contract.symbol, startDateStr=startDateTime, endDateStr=endDateTime)
+        _df = self._contractData[contract.symbol]['df']
         # FIXME: Should not be hard coded but based on max strategy bars needed
         n=100
         for index, row in _df[:n].iterrows():
@@ -264,6 +233,7 @@ class SimClient(Client):
             self.wrapper.historicalData(int(reqId), bar)
             self.wrapper.lastTime = bar.date
 
+        
         self._df = _df[n:]
         self.wrapper.ib.barUpdateEvent += self.update_executions
         if keepUpToDate:
@@ -386,10 +356,6 @@ class SimClient(Client):
 
     @override
     def reqPositions(self):
-        pos = load_positions()  # FIXME:
-        if pos: 
-            c = Contract()
-            self.wrapper.position(account=self._accounts[0], contract=c, posSize=0, avgCost=0)
         self.wrapper.positionEnd()
 
     # def reqAccountSummary(self, reqId, groupName, tags):

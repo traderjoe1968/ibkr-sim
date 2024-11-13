@@ -6,9 +6,9 @@ from ibkr_sim.sim_client import SimClient
 
 
 class IBSim(IB):
-    def __init__(self, AccountBalance):
+    def __init__(self, ContractData, AccountBalance=100_000.00):
         super(IBSim, self).__init__()
-        self.client = SimClient(self.wrapper, AccountBalance=100_000.00) 
+        self.client = SimClient(self.wrapper, ContractData, AccountBalance) 
 
         self.newOrderEvent += self.do_updateOrder
         self.orderModifyEvent += self.do_modifyOrder

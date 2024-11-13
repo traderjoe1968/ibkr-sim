@@ -65,5 +65,5 @@ sizeIncrement = 1
 initMargin = 19440.66
 commission = 3.5
 filename = 'ES_cc.csv'
-dbname = 'trading_data.sqlite'
+
 
