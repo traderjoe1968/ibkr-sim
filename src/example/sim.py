@@ -7,10 +7,11 @@ from ib_async import IB, util, Position, Trade, Fill, CommissionReport
 from ib_async.order import LimitOrder, Order, OrderStatus, StopOrder, MarketOrder
 
 from ibkr_sim.sim_ib import IBSim
+from ibkr_sim import stats
 from ibkr_sim.sim_contract_sim import load_contract
 from ibkr_sim.sim_contract_sim import load_csv
-from strategy.stoch_k import stoch_k, Signals
-import stats
+from stoch_k import stoch_k, Signals
+
 
 import logging
 logger = logging.getLogger()

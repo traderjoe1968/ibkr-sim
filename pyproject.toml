@@ -1,0 +1,29 @@
+[project]
+name = "ibkr_sim"
+version = "0.0.1"
+authors = [
+  { name="traderjoe1968", email="traderjoe1968@gmail.com" },
+]
+description = "A package that implements a simulation of IBKR API within ib_async framework to enable backtesting of trading strategies."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "eventkit>=1.0.3",
+    "ib_async>=1.0.3",
+    "nest-asyncio>=1.6.0",
+    "numpy>=2.1.2",
+    "pandas>=2.2.2",
+    "pandas_ta>=0.3.14b0",
+    "tzdata>=2024.1",
+]
+
+[project.urls]
+Homepage = "https://github.com/traderjoe1968/ibkr-sim"
+Issues = "https://github.com/traderjoe1968/ibkr-sim/issues"

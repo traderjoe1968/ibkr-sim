@@ -22,7 +22,7 @@ from ib_async.objects import (
     HistoricalTickLast, NewsProvider, PriceIncrement, Position, SmartComponent,
     SoftDollarTier, TagValue, TickAttribBidAsk, TickAttribLast, ConnectionStats, WshEventData)
 
-from ibkr_sim.sim_contract_sim import load_db, load_contractDetails, load_openorders, load_positions, load_executions, get_commission, get_margin
+from src.sim_contract_sim import load_db, load_contractDetails, load_openorders, load_positions, load_executions, get_commission, get_margin
 
 
 class SimClient(Client):
